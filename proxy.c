@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "csapp.h"
 #include <string.h>
+#include <pthread.h>
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
@@ -10,10 +11,8 @@ static const char *user_agent_hdr = "User-Agent: Mozilla/5.0 (X11; Linux x86_64;
 #define MAX_CHAR_SIZE 4096
 #define MAX_LINE 4096
 #define MAX_BUFF 4096
-int main(int argc,char** argv)
-{   int listenfd;
-    struct sockaddr_storage clientaddr;
-    socklen_t clientlen;
+void* thread(void*adrconf){
+    Pthread_detach(pthread_self());
     char method[MAX_CHAR_SIZE];
     char uri[MAX_CHAR_SIZE];
     char version[MAX_CHAR_SIZE];
@@ -29,11 +28,8 @@ int main(int argc,char** argv)
     char proxyconnection[MAX_LINE]="Proxy-Connection: close\r\n";
     char end[MAX_LINE]="\r\n";
     int n=0;
-    listenfd=open_listenfd(argv[1]);
-    while(1){
-        socklen_t clinetlen=sizeof(clientaddr);
-        int connfd=Accept(listenfd,(SA*)&clientaddr,&clinetlen);
-        Rio_readinitb(&rio,connfd);
+    int connfd=*((int*)adrconf);
+    Rio_readinitb(&rio,connfd);
         Rio_readlineb(&rio,buf,MAX_LINE);
         sscanf(buf,"%s %s %s",method,uri,version);
        char*p=uri+7;
@@ -102,6 +98,35 @@ int main(int argc,char** argv)
     while((n=Rio_readnb(&server_rio,buf,MAX_BUFF))>0){
         Rio_writen(connfd,buf,n);
     }
+    free(adrconf);
+    return NULL;
+}
+int main(int argc,char** argv)
+{   int listenfd;
+    struct sockaddr_storage clientaddr;
+    socklen_t clientlen;
+    char method[MAX_CHAR_SIZE];
+    char uri[MAX_CHAR_SIZE];
+    char version[MAX_CHAR_SIZE];
+    rio_t rio;
+    char buf[MAX_CHAR_SIZE];
+    char host[MAX_LINE];
+    char port[20]="80";
+    char path[MAX_LINE]="/";
+    char hostline[MAX_LINE];
+    char other_request[MAX_LINE]="";
+    char request[MAX_LINE]="";
+    char connection[MAX_LINE]="Connection: close\r\n";
+    char proxyconnection[MAX_LINE]="Proxy-Connection: close\r\n";
+    char end[MAX_LINE]="\r\n";
+    int n=0;
+    listenfd=open_listenfd(argv[1]);
+    while(1){
+        socklen_t clinetlen=sizeof(clientaddr);
+        int*connfdadr=malloc(sizeof(int));
+        *connfdadr=Accept(listenfd,(SA*)&clientaddr,&clinetlen);
+        pthread_t tid;
+        Pthread_create(&tid,NULL,thread,connfdadr);
 }
 return 0;
 }
